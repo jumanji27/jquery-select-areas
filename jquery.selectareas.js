@@ -11,6 +11,7 @@
             $trigger = parent.$trigger,
             $outline,
             $selection,
+            $dot,
             $resizeHandlers = {},
             $btDelete,
             resizeHorizontally = true,
@@ -91,11 +92,19 @@
                 $selection.css({
                     backgroundPosition : ( - area.x - 1) + "px " + ( - area.y - 1) + "px",
                     cursor : options.allowMove ? "move" : "default",
-                    width: (area.width - 2 > 0) ? (area.width - 2) : 0,
-                    height: (area.height - 2 > 0) ? (area.height - 2) : 0,
-                    left : area.x + 1,
-                    top : area.y + 1,
+                    width: (area.width > 0) ? (area.width) : 0,
+                    height: (area.height > 0) ? (area.height) : 0,
+                    left : area.x,
+                    top : area.y,
                     "z-index": area.z + 2
+                });
+
+                // Update the dot
+                offset = $selection.position()
+
+                $dot.css({
+                    top: (area.y + area.height / 2) - 5,
+                    left: (area.x + area.width / 2) - 5
                 });
             },
             updateResizeHandlers = function (show) {
@@ -135,7 +144,7 @@
                             display: "block",
                             left: area.x + left,
                             top: area.y + top,
-                            "z-index": area.z + 1
+                            "z-index": area.z + 10
                         });
                     });
                 } else {
@@ -425,11 +434,14 @@
                     $handler.remove();
                 });
                 if ($btDelete) {
-                    $btDelete.remove();    
-                } 
+                    $btDelete.remove();
+                }
                 parent._remove(id);
                 fireEvent("changed");
             },
+            moveDot = function(event) {
+                console.log('dot move action fired');
+            }
             getElementOffset = function (object) {
                 var offset = $(object).offset();
 
@@ -484,7 +496,7 @@
             $.each(["nw", "n", "ne", "e", "se", "s", "sw", "w"], function (key, card) {
                 $resizeHandlers[card] =  $("<div class=\"select-areas-resize-handler " + card + "\"/>")
                     .css({
-                        opacity : 0.5,
+                        opacity : 1,
                         position : "absolute",
                         cursor : card + "-resize"
                     })
@@ -493,6 +505,7 @@
                     .bind("touchstart", pickResizeHandler);
             });
         }
+
         // initialize delete button
         if (options.allowDelete) {
             var bindToDelete = function ($obj) {
@@ -506,6 +519,19 @@
                 .insertAfter($selection);
         }
 
+        // Initialize the dot
+        if (options.allowDot) {
+            var bindToDot = function ($obj) {
+                $obj.click(moveDot)
+                    .bind("touchstart", moveDot)
+                    .bind("tap", moveDot);
+                return $obj;
+            };
+            $dot = bindToDot($("<div class=\"dot-area\" />"))
+                .append(bindToDot($("<div class=\"select-areas-dot-area\" />")))
+                .insertAfter($selection);
+        }
+
         if (options.allowMove) {
             $selection.mousedown(pickSelection).bind("touchstart", pickSelection);
         }
@@ -516,6 +542,7 @@
             getData: getData,
             startSelection: startSelection,
             deleteSelection: deleteSelection,
+            moveDot: moveDot,
             options: options,
             blur: blur,
             focus: focus,
@@ -563,14 +590,15 @@
                 allowResize: true,
                 allowSelect: true,
                 allowDelete: true,
+                allowDot: true,
                 allowNudge: true,
                 aspectRatio: 0,
                 minSize: [0, 0],
                 maxSize: [0, 0],
                 width: 0,
                 maxAreas: 0,
-                outlineOpacity: 0.5,
-                overlayOpacity: 0.5,
+                outlineOpacity: 1,
+                overlayOpacity: 0.25,
                 areas: [],
                 onChanging: null,
                 onChanged: null
@@ -683,11 +711,6 @@
         this.$overlay.css({
             display : nbAreas? "block" : "none"
         });
-        if (nbAreas) {
-            this.$image.addClass("blurred");
-        } else {
-            this.$image.removeClass("blurred");
-        }
         this.$trigger.css({
             cursor : this.options.allowSelect ? "crosshair" : "default"
         });

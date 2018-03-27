@@ -66,3 +66,19 @@ div.image-decorator {
 	position: relative;
 	margin-bottom: 10px;
 }
+
+.select-areas-background-area {
+	opacity: 0.8;
+}
+
+.dot-area {
+	-moz-border-radius : 5px;
+	-webkit-border-radius : 5px;
+	position : absolute;
+	z-index: 110;
+	width: 8px;
+	height: 8px;
+	border-radius: 10px;
+	border: 2px solid #fff;
+	cursor: move;
+}
