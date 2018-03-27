@@ -11,20 +11,26 @@
             $trigger = parent.$trigger,
             $outline,
             $selection,
-            $dot,
             $resizeHandlers = {},
             $btDelete,
             resizeHorizontally = true,
             resizeVertically = true,
             selectionOffset = [0, 0],
             selectionOrigin = [0, 0],
+            selectionDotOrigin = [0, 0],
             area = {
                 id: id,
                 x: 0,
                 y: 0,
                 z: 0,
                 height: 0,
-                width: 0
+                width: 0,
+                dot: {
+                    x: 0,
+                    y: 0,
+                    height: 16,
+                    width: 16
+                }
             },
             blur = function () {
                 area.z = 0;
@@ -77,7 +83,18 @@
                     $(window.document).off(browserEvent).off(mobileEvent);
                 }
             },
-            updateSelection = function () {
+            updateSelection = function (type) {
+                // Update the dot only
+                if (type === "dot") {
+                    $selection.children(".dot-area").css({
+                        top: area.dot.y,
+                        left: area.dot.x
+                        // "z-index": area.z + 2
+                    });
+
+                    return;
+                }
+
                 // Update the outline layer
                 $outline.css({
                     cursor: "default",
@@ -90,7 +107,7 @@
 
                 // Update the selection layer
                 $selection.css({
-                    backgroundPosition : ( - area.x - 1) + "px " + ( - area.y - 1) + "px",
+                    backgroundPosition : (-area.x - 1) + "px " + (-area.y - 1) + "px",
                     cursor : options.allowMove ? "move" : "default",
                     width: (area.width > 0) ? (area.width) : 0,
                     height: (area.height > 0) ? (area.height) : 0,
@@ -100,15 +117,14 @@
                 });
 
                 // Update the dot
-                offset = $selection.position()
-
-                $dot.css({
-                    top: (area.y + area.height / 2) - 5,
-                    left: (area.x + area.width / 2) - 5
+                $selection.children(".dot-area").css({
+                    top: (area.height / 2),
+                    left: (area.width / 2),
+                    "z-index": area.z + 2
                 });
             },
             updateResizeHandlers = function (show) {
-                if (! options.allowResize) {
+                if (!options.allowResize) {
                     return;
                 }
                 if (show) {
@@ -206,6 +222,13 @@
                         updateBtDelete();
                         break;
 
+                    case "moveDotSelection":
+                        updateSelection("dot");
+                        break;
+
+                    case "pickDotSelection":
+                        break;
+
                     //case "releaseSelection":
                     default:
                         updateSelection();
@@ -235,6 +258,9 @@
                 area.x = selectionOrigin[0];
                 area.y = selectionOrigin[1];
 
+                area.dot.x = (area.x + area.width / 2)
+                area.dot.y = (area.y + area.height / 2)
+
                 refresh("startSelection");
             },
             pickSelection = function (event) {
@@ -250,6 +276,12 @@
                 selectionOffset[1] = mousePosition[1] - area.y;
 
                 refresh("pickSelection");
+            },
+            pickDotSelection = function(event) {
+                cancelEvent(event);
+                focus();
+                on("move", moveDotSelection);
+                on("stop", releaseDotSelection);
             },
             pickResizeHandler = function (event) {
                 cancelEvent(event);
@@ -372,7 +404,7 @@
             },
             moveSelection = function (event) {
                 cancelEvent(event);
-                if (! options.allowMove) {
+                if (!options.allowMove) {
                     return;
                 }
                 focus();
@@ -381,6 +413,21 @@
                 moveTo({
                     x: mousePosition[0] - selectionOffset[0],
                     y: mousePosition[1] - selectionOffset[1]
+                });
+
+                fireEvent("changing");
+            },
+            moveDotSelection = function (event) {
+                cancelEvent(event);
+                if (!options.allowDotMove) {
+                    return;
+                }
+                focus();
+
+                var mousePosition = getMousePosition(event);
+                moveDotTo({
+                    x: mousePosition[0] - area.x,
+                    y: mousePosition[1] - area.y
                 });
 
                 fireEvent("changing");
@@ -410,7 +457,29 @@
                 }
                 refresh("moveSelection");
             },
-            releaseSelection = function (event) {
+            moveDotTo = function (point) {
+                if (point.x > 0) {
+                    if (point.x < area.width) {
+                        area.dot.x = point.x;
+                    } else {
+                        area.dot.x = area.width
+                    }
+                } else {
+                    area.dot.x = 0;
+                }
+                if (point.y > 0) {
+                    if (point.y < area.height) {
+                        area.dot.y = point.y;
+                    } else {
+                        area.dot.y = area.height
+                    }
+                } else {
+                    area.dot.y = 0;
+                }
+
+                refresh("moveDotSelection");
+            },
+            releaseSelection = function (event, type) {
                 cancelEvent(event);
                 off("move", "stop");
 
@@ -426,6 +495,18 @@
 
                 refresh("releaseSelection");
             },
+            releaseDotSelection = function (event) {
+                cancelEvent(event);
+                off("move", "stop");
+
+                // Update the selection origin
+                selectionDotOrigin[0] = area.dot.x;
+                selectionDotOrigin[1] = area.dot.y;
+
+                fireEvent("changed", "dot");
+
+                refresh("releaseDotSelection");
+            },
             deleteSelection = function (event) {
                 cancelEvent(event);
                 $selection.remove();
@@ -440,7 +521,7 @@
                 fireEvent("changed");
             },
             moveDot = function(event) {
-                console.log('dot move action fired');
+                console.log("dot move action fired");
             }
             getElementOffset = function (object) {
                 var offset = $(object).offset();
@@ -450,7 +531,7 @@
             getMousePosition = function (event) {
                 var imageOffset = getElementOffset($image);
 
-                if (! event.pageX) {
+                if (!event.pageX) {
                     if (event.originalEvent) {
                         event = event.originalEvent;
                     }
@@ -522,14 +603,15 @@
         // Initialize the dot
         if (options.allowDot) {
             var bindToDot = function ($obj) {
-                $obj.click(moveDot)
-                    .bind("touchstart", moveDot)
-                    .bind("tap", moveDot);
+                $obj.mousedown(pickDotSelection).bind("touchstart", pickDotSelection);
+
                 return $obj;
             };
-            $dot = bindToDot($("<div class=\"dot-area\" />"))
-                .append(bindToDot($("<div class=\"select-areas-dot-area\" />")))
-                .insertAfter($selection);
+
+            $selection.append(
+                bindToDot($("<div class=\"dot-area\" />"))
+                    .append(bindToDot($("<div class=\"select-areas-dot-area\" />")))
+            );
         }
 
         if (options.allowMove) {
@@ -568,7 +650,7 @@
                 area = $.extend(area, dimensions);
                 selectionOrigin[0] = area.x;
                 selectionOrigin[1] = area.y;
-                if (! silent) {
+                if (!silent) {
                     fireEvent("changed");
                 }
             },
@@ -587,6 +669,7 @@
             defaultOptions = {
                 allowEdit: true,
                 allowMove: true,
+                allowDotMove: true,
                 allowResize: true,
                 allowSelect: true,
                 allowDelete: true,
@@ -598,7 +681,7 @@
                 width: 0,
                 maxAreas: 0,
                 outlineOpacity: 1,
-                overlayOpacity: 0.25,
+                overlayOpacity: 0,
                 areas: [],
                 onChanging: null,
                 onChanged: null
@@ -606,7 +689,7 @@
 
         this.options = $.extend(defaultOptions, customOptions);
 
-        if (! this.options.allowEdit) {
+        if (!this.options.allowEdit) {
             this.options.allowSelect = this.options.allowMove = this.options.allowResize = this.options.allowDelete = false;
         }
 
@@ -679,7 +762,7 @@
             this.$trigger.mousedown($.proxy(this.newArea, this)).on("touchstart", $.proxy(this.newArea, this));
         }
         if (this.options.allowNudge) {
-            $('html').keydown(function (e) { // move selection with arrow keys
+            $("html").keydown(function (e) { // move selection with arrow keys
                 var codes = {
                         37: "l",
                         38: "u",
@@ -777,7 +860,7 @@
             this._add(options);
         }
         this._refresh();
-        if (! this.options.allowSelect && ! this.options.allowMove && ! this.options.allowResize && ! this.options.allowDelete) {
+        if (!this.options.allowSelect && !this.options.allowMove && !this.options.allowResize && !this.options.allowDelete) {
             this.blurAll();
         }
     };
@@ -797,7 +880,7 @@
         this.$trigger.remove();
         this.$image.css("width", "").css("position", "").unwrap();
         this.$image.removeData("mainImageSelectAreas");
-        this.$image.off('changing changed loaded');
+        this.$image.off("changing changed loaded");
     };
 
     $.imageSelectAreas.prototype.areas = function () {
@@ -845,7 +928,7 @@
 
     $.selectAreas = function(object, options) {
         var $object = $(object);
-        if (! $object.data("mainImageSelectAreas")) {
+        if (!$object.data("mainImageSelectAreas")) {
             var mainImageSelectAreas = new $.imageSelectAreas();
             mainImageSelectAreas.init(object, options);
             $object.data("mainImageSelectAreas", mainImageSelectAreas);
@@ -860,7 +943,7 @@
             var ret = $.imageSelectAreas.prototype[ customOptions ].apply( $.selectAreas(this), Array.prototype.slice.call( arguments, 1 ));
             return typeof ret === "undefined" ? this : ret;
 
-        } else if ( typeof customOptions === "object" || ! customOptions ) { // Initialization
+        } else if ( typeof customOptions === "object" || !customOptions ) { // Initialization
             //Iterate over each object
             this.each(function() {
                 var currentObject = this,
