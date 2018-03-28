@@ -1,9 +1,3 @@
-/* global window, Image, jQuery */
-/**
- * @author 360Learning
- * @author Catalin Dogaru (https://github.com/cdog - http://code.tutsplus.com/tutorials/how-to-create-a-jquery-image-cropping-plugin-from-scratch-part-i--net-20994)
- * @author Adrien David-Sivelle (https://github.com/AdrienDS - Refactoring, Multiselections & Mobile compatibility)
- */
 (function($) {
     $.imageArea = function(parent, id) {
         var options = parent.options,
@@ -17,7 +11,6 @@
             resizeVertically = true,
             selectionOffset = [0, 0],
             selectionOrigin = [0, 0],
-            selectionDotOrigin = [0, 0],
             area = {
                 id: id,
                 x: 0,
@@ -51,8 +44,8 @@
                 var event = e || window.event || {};
                 event.cancelBubble = true;
                 event.returnValue = false;
-                event.stopPropagation && event.stopPropagation(); // jshint ignore: line
-                event.preventDefault && event.preventDefault(); // jshint ignore: line
+                event.stopPropagation && event.stopPropagation();
+                event.preventDefault && event.preventDefault();
             },
             off = function() {
                 $.each(arguments, function (key, val) {
@@ -88,8 +81,8 @@
                 if (type === "dot") {
                     $selection.children(".dot-area").css({
                         top: area.dot.y,
-                        left: area.dot.x
-                        // "z-index": area.z + 2
+                        left: area.dot.x,
+                        opacity: 1
                     });
 
                     return;
@@ -118,9 +111,8 @@
 
                 // Update the dot
                 $selection.children(".dot-area").css({
-                    top: (area.height / 2),
-                    left: (area.width / 2),
-                    "z-index": area.z + 2
+                    top: area.dot.y,
+                    left: area.dot.x
                 });
             },
             updateResizeHandlers = function (show) {
@@ -136,23 +128,23 @@
                             vertical = name[0],
                             horizontal = name[name.length - 1];
 
-                        if (vertical === "n") {             // ====== North* ======
+                        if (vertical === "n") {             // North
                             top = - semiheight;
 
-                        } else if (vertical === "s") {      // ====== South* ======
+                        } else if (vertical === "s") {      // South
                             top = area.height - semiheight - 1;
 
-                        } else {                            // === East & West ===
+                        } else {                            // East & West
                             top = Math.round(area.height / 2) - semiheight - 1;
                         }
 
-                        if (horizontal === "e") {           // ====== *East ======
+                        if (horizontal === "e") {           // East
                             left = area.width - semiwidth - 1;
 
-                        } else if (horizontal === "w") {    // ====== *West ======
+                        } else if (horizontal === "w") {    // West
                             left = - semiwidth;
 
-                        } else {                            // == North & South ==
+                        } else {                            // North & South
                             left = Math.round(area.width / 2) - semiwidth - 1;
                         }
 
@@ -229,7 +221,6 @@
                     case "pickDotSelection":
                         break;
 
-                    //case "releaseSelection":
                     default:
                         updateSelection();
                         updateResizeHandlers(true);
@@ -258,8 +249,8 @@
                 area.x = selectionOrigin[0];
                 area.y = selectionOrigin[1];
 
-                area.dot.x = (area.x + area.width / 2)
-                area.dot.y = (area.y + area.height / 2)
+                area.dot.x = area.width / 2;
+                area.dot.y = area.height / 2;
 
                 refresh("startSelection");
             },
@@ -281,7 +272,7 @@
                 cancelEvent(event);
                 focus();
                 on("move", moveDotSelection);
-                on("stop", releaseDotSelection);
+                on("stop", releaseSelection);
             },
             pickResizeHandler = function (event) {
                 cancelEvent(event);
@@ -328,11 +319,17 @@
                 if (selectionOrigin[0] + width < 0 || selectionOrigin[0] + width > $image.width()) {
                     width = - width;
                 }
-                if (selectionOrigin[1] + height < 0 || selectionOrigin[1] + height > $image.height()) {
+                if (
+                    selectionOrigin[1] + height < 0 || selectionOrigin[1] + height > $image.height()
+                ) {
                     height = - height;
                 }
-                // Test if the selection size is bigger than the maximum size (ignored if minSize > maxSize)
-                if (options.maxSize[0] > options.minSize[0] && options.maxSize[1] > options.minSize[1]) {
+                // Test if the selection size is bigger than the maximum size
+                // (ignored if minSize > maxSize)
+                if (
+                    options.maxSize[0] > options.minSize[0]
+                        && options.maxSize[1] > options.minSize[1]
+                ) {
                     if (Math.abs(width) > options.maxSize[0]) {
                         width = (width >= 0) ? options.maxSize[0] : - options.maxSize[0];
                     }
@@ -349,6 +346,7 @@
                 if (resizeVertically) {
                     area.height = height;
                 }
+
                 // If any aspect ratio is specified
                 if (options.aspectRatio) {
                     // Calculate the new width and height
@@ -368,17 +366,26 @@
                     // Test if the new size exceeds the image bounds
                     if (selectionOrigin[0] + width > $image.width()) {
                         width = $image.width() - selectionOrigin[0];
-                        height = (height > 0) ? Math.round(width / options.aspectRatio) : - Math.round(width / options.aspectRatio);
+                        height =
+                            height > 0
+                                ? Math.round(width / options.aspectRatio)
+                                : - Math.round(width / options.aspectRatio);
                     }
 
                     if (selectionOrigin[1] + height < 0) {
                         height = - selectionOrigin[1];
-                        width = (width > 0) ? - Math.round(height * options.aspectRatio) : Math.round(height * options.aspectRatio);
+                        width =
+                            width > 0
+                                ? - Math.round(height * options.aspectRatio)
+                                : Math.round(height * options.aspectRatio);
                     }
 
                     if (selectionOrigin[1] + height > $image.height()) {
                         height = $image.height() - selectionOrigin[1];
-                        width = (width > 0) ? Math.round(height * options.aspectRatio) : - Math.round(height * options.aspectRatio);
+                        width =
+                            width > 0
+                                ? Math.round(height * options.aspectRatio)
+                                : - Math.round(height * options.aspectRatio);
                     }
 
                     // Set the selection size
@@ -398,6 +405,9 @@
                 } else {
                     area.y = selectionOrigin[1];
                 }
+
+                area.dot.x = area.width / 2;
+                area.dot.y = area.height / 2;
 
                 fireEvent("changing");
                 refresh("resizeSelection");
@@ -492,20 +502,7 @@
                 resizeVertically = true;
 
                 fireEvent("changed");
-
                 refresh("releaseSelection");
-            },
-            releaseDotSelection = function (event) {
-                cancelEvent(event);
-                off("move", "stop");
-
-                // Update the selection origin
-                selectionDotOrigin[0] = area.dot.x;
-                selectionDotOrigin[1] = area.dot.y;
-
-                fireEvent("changed", "dot");
-
-                refresh("releaseDotSelection");
             },
             deleteSelection = function (event) {
                 cancelEvent(event);
@@ -520,9 +517,6 @@
                 parent._remove(id);
                 fireEvent("changed");
             },
-            moveDot = function(event) {
-                console.log("dot move action fired");
-            }
             getElementOffset = function (object) {
                 var offset = $(object).offset();
 
@@ -575,15 +569,15 @@
         // Initialize all handlers
         if (options.allowResize) {
             $.each(["nw", "n", "ne", "e", "se", "s", "sw", "w"], function (key, card) {
-                $resizeHandlers[card] =  $("<div class=\"select-areas-resize-handler " + card + "\"/>")
-                    .css({
-                        opacity : 1,
-                        position : "absolute",
-                        cursor : card + "-resize"
-                    })
-                    .insertAfter($selection)
-                    .mousedown(pickResizeHandler)
-                    .bind("touchstart", pickResizeHandler);
+                $resizeHandlers[card] =
+                    $("<div class=\"select-areas-resize-handler " + card + "\"/>")
+                        .css({
+                            position : "absolute",
+                            cursor : card + "-resize"
+                        })
+                        .insertAfter($selection)
+                        .mousedown(pickResizeHandler)
+                        .bind("touchstart", pickResizeHandler);
             });
         }
 
@@ -596,7 +590,7 @@
                 return $obj;
             };
             $btDelete = bindToDelete($("<div class=\"delete-area\" />"))
-                .append(bindToDelete($("<div class=\"select-areas-delete-area\" />")))
+                .append(bindToDelete($("<div class=\"select-areas-delete-area\">✕</div>")))
                 .insertAfter($selection);
         }
 
@@ -624,7 +618,6 @@
             getData: getData,
             startSelection: startSelection,
             deleteSelection: deleteSelection,
-            moveDot: moveDot,
             options: options,
             blur: blur,
             focus: focus,
@@ -647,9 +640,18 @@
                 fireEvent("changed");
             },
             set: function (dimensions, silent) {
+               if (!dimensions.dot) {
+                    dimensions.dot = {
+                        x: dimensions.width / 2,
+                        y: dimensions.height / 2
+                    }
+                }
+
                 area = $.extend(area, dimensions);
+
                 selectionOrigin[0] = area.x;
                 selectionOrigin[1] = area.y;
+
                 if (!silent) {
                     fireEvent("changed");
                 }
@@ -676,7 +678,7 @@
                 allowDot: true,
                 allowNudge: true,
                 aspectRatio: 0,
-                minSize: [0, 0],
+                minSize: [40, 40],
                 maxSize: [0, 0],
                 width: 0,
                 maxAreas: 0,
@@ -759,7 +761,10 @@
 
         if (this.options.allowSelect) {
             // Bind an event handler to the "mousedown" event of the trigger layer
-            this.$trigger.mousedown($.proxy(this.newArea, this)).on("touchstart", $.proxy(this.newArea, this));
+            this
+                .$trigger
+                .mousedown($.proxy(this.newArea, this))
+                .on("touchstart", $.proxy(this.newArea, this));
         }
         if (this.options.allowNudge) {
             $("html").keydown(function (e) { // move selection with arrow keys
@@ -934,17 +939,24 @@
             $object.data("mainImageSelectAreas", mainImageSelectAreas);
             $object.trigger("loaded");
         }
+
         return $object.data("mainImageSelectAreas");
     };
 
-
     $.fn.selectAreas = function(customOptions) {
-        if ( $.imageSelectAreas.prototype[customOptions] ) { // Method call
-            var ret = $.imageSelectAreas.prototype[ customOptions ].apply( $.selectAreas(this), Array.prototype.slice.call( arguments, 1 ));
+        if ($.imageSelectAreas.prototype[customOptions]) { // Method call
+            var ret =
+                $.imageSelectAreas
+                    .prototype[customOptions]
+                    .apply(
+                        $.selectAreas(this),
+                        Array.prototype.slice.call(arguments, 1)
+                    );
+
             return typeof ret === "undefined" ? this : ret;
 
-        } else if ( typeof customOptions === "object" || !customOptions ) { // Initialization
-            //Iterate over each object
+        } else if (typeof customOptions === "object" || !customOptions) { // Initialization
+            // Iterate over each object
             this.each(function() {
                 var currentObject = this,
                     image = new Image();
@@ -956,12 +968,11 @@
 
                 // Reset the src because cached images don"t fire load sometimes
                 image.src = currentObject.src;
-
             });
-            return this;
 
+            return this;
         } else {
-            $.error( "Method " +  customOptions + " does not exist on jQuery.selectAreas" );
+            $.error("Method " +  customOptions + " does not exist on jQuery.selectAreas");
         }
     };
-}) (jQuery);
+})(jQuery);
