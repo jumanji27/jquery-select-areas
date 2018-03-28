@@ -52,7 +52,7 @@
                     on(val);
                 });
             },
-            on = function (type, handler) {
+            on = function (type, handler, params) {
                 var browserEvent, mobileEvent;
                 switch (type) {
                     case "start":
@@ -70,8 +70,15 @@
                     default:
                         return;
                 }
+
                 if (handler && jQuery.isFunction(handler)) {
-                    $(window.document).on(browserEvent, handler).on(mobileEvent, handler);
+                    $(window.document)
+                        .on(browserEvent, function(event) {
+                            handler(event, params);
+                        })
+                        .on(mobileEvent, function(event) {
+                            handler(event, params);
+                        })
                 } else {
                     $(window.document).off(browserEvent).off(mobileEvent);
                 }
@@ -234,7 +241,7 @@
                 area.width = options.minSize[0];
                 area.height = options.minSize[1];
                 focus();
-                on("move", resizeSelection);
+                on("move", resizeSelection, {init: true});
                 on("stop", releaseSelection);
 
                 // Get the selection origin
@@ -298,7 +305,7 @@
 
                 refresh("pickResizeHandler");
             },
-            resizeSelection = function (event) {
+            resizeSelection = function (event, params) {
                 cancelEvent(event);
                 focus();
 
@@ -338,6 +345,8 @@
                         height = (height >= 0) ? options.maxSize[1] : - options.maxSize[1];
                     }
                 }
+
+                prevArea = $.extend(true, {}, area);
 
                 // Set the selection size
                 if (resizeHorizontally) {
@@ -406,8 +415,42 @@
                     area.y = selectionOrigin[1];
                 }
 
-                area.dot.x = area.width / 2;
-                area.dot.y = area.height / 2;
+                if (params && params.init) {
+                    area.dot.x = area.width / 2;
+                    area.dot.y = area.height / 2;
+                } else {
+                    if (selectionOrigin[0] === area.x) {
+                        if (area.dot.x > area.width) area.dot.x = area.width;
+                    } else {
+                        diff = prevArea.width - area.width;
+
+                        if (diff > 0) {
+                            if (area.dot.x > 0) {
+                                area.dot.x = area.dot.x - diff
+                            } else {
+                                area.dot.x = 0
+                            }
+                        } else {
+                            area.dot.x = area.dot.x - diff
+                        }
+                    }
+
+                    if (selectionOrigin[1] === area.y) {
+                        if (area.dot.y > area.height) area.dot.y = area.height;
+                    } else {
+                        diff = prevArea.height - area.height;
+
+                        if (diff > 0) {
+                            if (area.dot.y > 0) {
+                                area.dot.y = area.dot.y - diff
+                            } else {
+                                area.dot.y = 0
+                            }
+                        } else {
+                            area.dot.y = area.dot.y - diff
+                        }
+                    }
+                }
 
                 fireEvent("changing");
                 refresh("resizeSelection");
